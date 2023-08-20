@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.sql.DriverManager;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -182,7 +181,7 @@ public class JCLClassLoader extends URLClassLoader {
                         }
                         return clazz;
                     }
-                } catch (ClassNotFoundException e) {
+                } catch (ClassNotFoundException ignored) {
                 }
             }
             boolean delegateLoad = parent != null;
