@@ -1,4 +1,4 @@
-package com.minsunny.jcl.resource;
+package com.minesunny.jcl.resource;
 
 /**
  * @Author: Mine

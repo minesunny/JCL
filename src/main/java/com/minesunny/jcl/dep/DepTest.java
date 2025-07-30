@@ -1,4 +1,4 @@
-package com.minsunny.jcl.dep;
+package com.minesunny.jcl.dep;
 
 import lombok.AccessLevel;
 

@@ -1,4 +1,4 @@
-package com.minsunny.jcl.util;
+package com.minesunny.jcl.util;
 
 
 import java.io.IOException;

@@ -1,7 +1,7 @@
-package com.minsunny.jcl.loader;
+package com.minesunny.jcl.loader;
 
-import com.minsunny.jcl.config.JCLProperties;
-import com.minsunny.jcl.resource.ResourceEntry;
+import com.minesunny.jcl.config.JCLProperties;
+import com.minesunny.jcl.resource.ResourceEntry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;

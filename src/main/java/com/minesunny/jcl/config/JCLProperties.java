@@ -1,6 +1,6 @@
-package com.minsunny.jcl.config;
+package com.minesunny.jcl.config;
 
-import com.minsunny.jcl.util.JarUtils;
+import com.minesunny.jcl.util.JarUtils;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;

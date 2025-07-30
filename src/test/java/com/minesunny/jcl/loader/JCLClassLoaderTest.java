@@ -1,6 +1,6 @@
-package com.minsunny.jcl.loader;
+package com.minesunny.jcl.loader;
 
-import com.minsunny.jcl.config.JCLProperties;
+import com.minesunny.jcl.config.JCLProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -13,13 +13,13 @@ class JCLClassLoaderTest {
         String jarPath = Objects.requireNonNull(JCLClassLoaderTest.class.getClassLoader()
                         .getResource(""))
                 .getPath()
-                .replace("jcl-core/target/test-classes/", "/jar/mysql8");
+                .replace("target/test-classes/", "/jar/mysql8");
         JCLProperties jclProperties = new JCLProperties(jarPath);
         JCLClassLoader jclClassLoader = new JCLClassLoader(jclProperties);
         Class<?> aClass = jclClassLoader.loadClass("com.mysql.jdbc.Driver");
-        Assertions.assertEquals(aClass.getClassLoader().getClass(), JCLClassLoader.class);
+        Assertions.assertEquals(JCLClassLoader.class, aClass.getClassLoader().getClass());
         Class<?> aClass1 = Class.forName("com.mysql.jdbc.Driver");
-        Assertions.assertNotEquals(aClass1.getClassLoader().getClass(), JCLClassLoader.class);
+        Assertions.assertNotEquals(JCLClassLoader.class, aClass1.getClassLoader().getClass());
 
     }
 
@@ -28,11 +28,11 @@ class JCLClassLoaderTest {
         String jarPath = Objects.requireNonNull(JCLClassLoaderTest.class.getClassLoader()
                         .getResource(""))
                 .getPath()
-                .replace("jcl-core/target/test-classes/", "/jar/mysql8/mysql-connector-java-8.0.30.jar");
+                .replace("target/test-classes/", "/jar/mysql8/mysql-connector-java-8.0.30.jar");
         JCLProperties jclProperties = new JCLProperties(jarPath);
         JCLClassLoader jclClassLoader = new JCLClassLoader(jclProperties);
         Class<?> aClass = jclClassLoader.loadClass("com.mysql.jdbc.Driver");
-        Assertions.assertEquals(aClass.getClassLoader().getClass(), JCLClassLoader.class);
+        Assertions.assertEquals(JCLClassLoader.class, aClass.getClassLoader().getClass());
     }
 
     @Test
@@ -40,7 +40,7 @@ class JCLClassLoaderTest {
         String jarPath = Objects.requireNonNull(JCLClassLoaderTest.class.getClassLoader()
                         .getResource(""))
                 .getPath()
-                .replace("jcl-core/target/test-classes/", "/jar/mysql8/mysql-connector-java-8.0.30.jar");
+                .replace("target/test-classes/", "/jar/mysql8/mysql-connector-java-8.0.30.jar");
         JCLProperties jclProperties = new JCLProperties(jarPath);
         JCLClassLoader jclClassLoader = new JCLClassLoader(jclProperties);
         Class<?> aClass = jclClassLoader.loadClass("com.mysql.jdbc.Driver");
@@ -54,7 +54,7 @@ class JCLClassLoaderTest {
         String jarPath = Objects.requireNonNull(JCLClassLoaderTest.class.getClassLoader()
                         .getResource(""))
                 .getPath()
-                .replace("jcl-core/target/test-classes/", "/jar/dep");
+                .replace("target/test-classes/", "/jar/dep");
         JCLProperties jclProperties = new JCLProperties(jarPath);
         JCLClassLoader jclClassLoader = new JCLClassLoader(jclProperties);
         Class<?> aClass = jclClassLoader.loadClass("com.minsunny.jcl.dep.DepTest");
