@@ -32,8 +32,6 @@ jobs:
           name: Release ${{ github.ref_name }}
           files: |
             target/*.jar
-            target/*.pom
-            target/*-sources.jar
-            target/*-javadoc.jar
+
         env:
           GITHUB_TOKEN: ${{ github.token }}
