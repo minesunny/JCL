@@ -5,8 +5,12 @@ import com.minesunny.jcl.resource.ResourceEntry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.util.Enumeration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class JCLClassLoader extends URLClassLoader {
 
     private static final String CLASS_FILE_SUFFIX = ".class";
-    public static Map<String, JCLClassLoader> jclClassLoaders = new ConcurrentHashMap<>();
+    public static Map<String, WeakReference<JCLClassLoader>> jclClassLoaders = new ConcurrentHashMap<>();
     /**
      * The parent class loader.
      */
@@ -27,7 +31,7 @@ public class JCLClassLoader extends URLClassLoader {
     public JCLClassLoader(JCLProperties properties) {
         this(properties.getUrls(), properties.getParentLoader());
         this.properties = properties;
-        jclClassLoaders.put(properties.getJarDir(), this);
+        jclClassLoaders.put(properties.getJarDir(), new WeakReference<>(this));
 
     }
 
@@ -267,5 +271,122 @@ public class JCLClassLoader extends URLClassLoader {
     @Override
     public void close() throws IOException {
         super.close();
+    }
+
+    /**
+     * 释放当前类加载器：
+     * 1. 注销 JDBC DriverManager 中由当前 ClassLoader 注册的驱动（防止 JVM 级别的强引用泄露）
+     * 2. 关闭 MySQL 清理线程（如果存在）
+     * 3. 从静态注册表中注销 WeakReference
+     * 4. 清理本地缓存资源/Class 引用
+     * 5. 关闭 URLClassLoader 释放已打开的 jar 文件句柄
+     *
+     * @throws IOException 如果关闭底层资源失败
+     */
+    public void release() throws IOException {
+        deregisterJdbcDrivers();
+        shutdownAbandonedConnectionCleanupThread();
+        try {
+            java.util.ResourceBundle.clearCache(this);
+        } catch (Throwable ignored) {
+        }
+        try {
+            java.beans.Introspector.flushCaches();
+        } catch (Throwable ignored) {
+        }
+        if (this.properties != null && this.properties.getJarDir() != null) {
+            jclClassLoaders.remove(this.properties.getJarDir());
+        }
+        this.resourceEntries.clear();
+        this.close();
+    }
+
+    /**
+     * 注销由当前 ClassLoader 加载并注册到 DriverManager 中的所有 JDBC Driver。
+     * 由于 DriverManager.getDrivers() 和 deregisterDriver() 具有 CallerSensitive 校验，
+     * 必须由当前 ClassLoader 内部加载的类来调用，才能感知并注销自身注册的 Driver。
+     */
+    private void deregisterJdbcDrivers() {
+        try {
+            // 通过当前 ClassLoader 动态加载/定义清洁工类，使得调用 DriverManager 的 caller 是当前加载器
+            String cleanerClassName = JdbcDriverCleaner.class.getName();
+            String path = cleanerClassName.replace('.', '/') + ".class";
+            try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream(path)) {
+                if (in != null) {
+                    byte[] bytes = in.readAllBytes();
+                    Class<?> cleanerClass = defineClass(cleanerClassName, bytes, 0, bytes.length);
+                    Runnable cleaner = (Runnable) cleanerClass.getDeclaredConstructor().newInstance();
+                    cleaner.run();
+                }
+            }
+        } catch (Throwable t) {
+            log.warn("注销 JDBC 驱动失败: {}", t.getMessage());
+        }
+    }
+
+    /**
+     * 关闭 MySQL Connector 派生的后台清理线程 AbandonedConnectionCleanupThread（如果已启动）
+     */
+    private void shutdownAbandonedConnectionCleanupThread() {
+        try {
+            Class<?> threadClass = null;
+            try {
+                threadClass = loadClass("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread");
+            } catch (Throwable ignored) {
+            }
+            if (threadClass != null) {
+                java.lang.reflect.Method uncheckedShutdown = threadClass.getMethod("uncheckedShutdown");
+                uncheckedShutdown.invoke(null);
+
+                // 等待 ExecutorService 线程池中的 Worker 线程完全退出并释放 ClassLoader
+                java.lang.reflect.Field executorField = threadClass.getDeclaredField("cleanupThreadExecutorService");
+                executorField.setAccessible(true);
+                java.util.concurrent.ExecutorService executor = (java.util.concurrent.ExecutorService) executorField.get(null);
+                if (executor != null) {
+                    executor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS);
+                    executorField.set(null, null);
+                }
+
+                // 清理 threadRef 及其 ContextClassLoader
+                try {
+                    java.lang.reflect.Field threadRefField = threadClass.getDeclaredField("threadRef");
+                    threadRefField.setAccessible(true);
+                    Thread t = (Thread) threadRefField.get(null);
+                    if (t != null) {
+                        t.setContextClassLoader(null);
+                        threadRefField.set(null, null);
+                    }
+                } catch (Throwable ignored) {
+                }
+
+                // 清理 PhantomReferences 集合
+                try {
+                    java.lang.reflect.Field refsField = threadClass.getDeclaredField("connectionFinalizerPhantomRefs");
+                    refsField.setAccessible(true);
+                    java.util.Set<?> refs = (java.util.Set<?>) refsField.get(null);
+                    if (refs != null) {
+                        refs.clear();
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * 根据 jarDir 从全局注册表中释放对应的类加载器
+     *
+     * @param jarDir 资源目录
+     * @throws IOException 如果关闭底层资源失败
+     */
+    public static void release(String jarDir) throws IOException {
+        WeakReference<JCLClassLoader> ref = jclClassLoaders.remove(jarDir);
+        if (ref != null) {
+            JCLClassLoader loader = ref.get();
+            if (loader != null) {
+                loader.release();
+            }
+        }
     }
 }
